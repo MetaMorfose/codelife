@@ -1,0 +1,196 @@
+ArrayList<Particle> particles;
+PImage[] bullets;
+PImage red_bullet;
+PImage green_bullet;
+PImage blue_bullet;
+
+final float GRAVITY = 200;
+
+PImage img;
+PFont font;
+
+void setup() {
+  frameRate(60);
+  noStroke();
+  size(displayWidth, displayHeight, P3D);
+  font = loadFont("cgb-108.vlw");
+  textFont(font);
+
+  red_bullet = loadImage("bullet.jpg");
+  green_bullet = loadImage("bullet2.jpg");
+  blue_bullet = loadImage("bullet3.jpg");
+  
+  bullets = new PImage[]{red_bullet, green_bullet, blue_bullet};
+  
+  PVector GravityVector = new PVector(0, GRAVITY);
+  
+  
+  PVector rocket_vel = PVector.fromAngle(-PI/3.0);
+  rocket_vel.mult(150.0);
+  
+  particles = new ArrayList<Particle>();
+ 
+ for (float i=0; i<100; i++) { 
+    createRocket(i*0.5);
+ }
+
+}
+
+void draw() {
+
+  background(0);
+ 
+  blendMode(ADD);
+  
+  text("BOM ANO DE 2016", 200, 500);
+  
+  color black = color(0, 0, 0);
+  
+  for (int i=0; i<8; i++) { 
+    for(Particle p: particles) {
+      float t = get_t() - i * 0.02;
+      if (t >= p.initial_t && t < p.end_t) {
+        PVector velVector = new PVector(p.x.vel(t), p.y.vel(t));
+        pushMatrix();
+        translate(p.x.pos(t), p.y.pos(t));
+        rotate(velVector.heading() - PI * 0);
+        scale(0.2, 0.2);
+        drawSpark(p.image);
+        popMatrix();
+      }
+    }
+  }
+  
+  if (get_t() < 55.0) {
+    saveFrame();
+  }
+}
+
+float get_t() {
+  return frameCount/10.0;
+}
+
+void createRocket(float time) {
+  PVector initial_pos = new PVector((width/2.0), height);
+  float burn_time = 1.5 + random(0.4);
+  float glide_time = 1.0 + random(0.5);
+  float thrust_mag = 400;
+  PVector thrust_vector = PVector.fromAngle(3.0*PI/2.0 + random(-0.2, 0.2));
+  thrust_vector.setMag(thrust_mag);
+  
+  PVector rocket_accel = new PVector(0, GRAVITY);
+  rocket_accel.add(thrust_vector);
+
+  Particle rocket_with_thrust = new Particle(
+    initial_pos,
+    new PVector(0, 0),
+    rocket_accel,
+    time,
+    time + burn_time,
+    color(255, 100, 100),
+    red_bullet
+    );
+    
+  Particle rocket_without_thrust = new Particle(
+    rocket_with_thrust.pos(time + burn_time),
+    rocket_with_thrust.vel(time + burn_time),
+    new PVector(0, GRAVITY),
+    time + burn_time,
+    time + burn_time + glide_time,
+    color(255, 100, 100),
+    red_bullet
+    );  
+  
+  particles.add(rocket_with_thrust);
+  particles.add(rocket_without_thrust);  
+  
+  createExplosion(
+    rocket_without_thrust.pos(time + burn_time + glide_time),
+    rocket_without_thrust.vel(time + burn_time + glide_time),
+    time + burn_time + glide_time,
+    bullets[int(random(3))]
+  );
+  
+}
+
+void createExplosion(PVector position, PVector rocketVector, float time, PImage image) {
+  for (int i=0;i<80;i++) {
+
+    float explosion_vel = 150;
+    PVector vel;
+    vel = PVector.random3D();
+    vel.mult(explosion_vel);
+    vel.add(rocketVector);
+    
+    particles.add(new Particle(
+      position,
+      vel,
+      new PVector(0, GRAVITY),
+      time,
+      time + 1.0 + random(0.2) + random(0.2) + random(0.2),
+      color(255, 100, 100),
+      image
+      ));    
+
+  }
+
+}
+
+void drawSpark(PImage image) {
+  image(image, -32, -32);
+}
+
+class Particle {
+  color baseColor;
+  Motion x;
+  Motion y;
+  float initial_t;
+  float end_t;
+  PImage image;
+  
+  Particle(PVector position, PVector velocity, PVector accel, float initial_t, float end_t, color baseColor, PImage image){
+    this.x = new Motion(position.x, velocity.x, accel.x, initial_t);
+    this.y = new Motion(position.y, velocity.y, accel.y, initial_t);
+    this.initial_t = initial_t;
+    this.end_t = end_t;
+    this.baseColor = baseColor;
+    this.image = image;
+  }
+  
+  PVector pos(float t){
+    return new PVector(this.x.pos(t), this.y.pos(t));
+  }
+  
+  PVector vel(float t){
+    return new PVector(this.x.vel(t), this.y.vel(t));
+  }
+  
+  PVector accel(){
+    return new PVector(this.x.accel, this.y.accel);
+  }
+}
+
+class Motion {
+  float initial_pos;
+  float initial_vel;
+  float accel;
+  float initial_t;
+  float t0_pos;
+  float t0_vel;
+  
+  Motion(float initial_pos, float initial_vel, float accel, float initial_t) {
+    this.accel = accel;
+    this.t0_vel = 0;
+    this.t0_vel = initial_vel - vel(initial_t);
+    this.t0_pos = 0;
+    this.t0_pos = initial_pos - pos(initial_t);
+  }
+  
+  public float vel(float t){
+    return this.accel * t + this.t0_vel;
+  }
+  
+  public float pos(float t){
+    return 0.5 * this.accel * pow(t, 2) + this.t0_vel * t + this.t0_pos;
+  }
+}
